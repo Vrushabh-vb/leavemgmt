@@ -11,6 +11,8 @@ import { toast } from "@/components/ui/use-toast"
 import { CalendarIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import NumberOfDaysOptimizer from "./NumberOfDaysOptimizer"
 
 type LeaveType = "PL" | "CL" | "RH"
 
@@ -45,6 +47,7 @@ export default function LeaveOptimizer() {
   const [startDateOpen, setStartDateOpen] = useState(false)
   const [endDateOpen, setEndDateOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<LeaveSuggestion[]>([])
+  const [activeTab, setActiveTab] = useState<string>("date-range")
   
   // Add state for leave type selection
   const [selectedLeaveTypes, setSelectedLeaveTypes] = useState({
@@ -456,288 +459,304 @@ export default function LeaveOptimizer() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Leave Optimizer</h2>
-      <p className="text-muted-foreground">Plan your leaves efficiently by selecting a date range, and we'll suggest the best ways to optimize your leave balance.</p>
+      <p className="text-muted-foreground">
+        Plan your leaves efficiently using different optimization strategies to maximize your time off.
+      </p>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Date Range</CardTitle>
-          <CardDescription>Choose the period you're interested in taking leave</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Start Date</label>
-              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(date) => {
-                      setStartDate(date)
-                      setStartDateOpen(false)
-                    }}
-                    disabled={(date) => isUsedDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="date-range">Date Range Optimizer</TabsTrigger>
+          <TabsTrigger value="days-count">Number of Days Optimizer</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="date-range" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Date Range</CardTitle>
+              <CardDescription>Choose the period you're interested in taking leave</CardDescription>
+            </CardHeader>
             
-            <div className="space-y-2">
-              <label className="text-sm font-medium">End Date</label>
-              <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(date) => {
-                      setEndDate(date)
-                      setEndDateOpen(false)
-                    }}
-                    disabled={(date) => isUsedDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          
-          {/* Leave Type Selection */}
-          <div className="space-y-3 p-3 bg-gray-50 rounded-md">
-            <label className="text-sm font-medium block mb-2">
-              Leave Types to Include
-            </label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="usePL"
-                  checked={selectedLeaveTypes.usePL}
-                  onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, usePL: !!checked}))}
-                  disabled={leaveBalance.pl <= 0}
-                />
-                <label htmlFor="usePL" className="text-sm">
-                  Use Paid Leave (PL) - {leaveBalance.pl} days remaining
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="useCL"
-                  checked={selectedLeaveTypes.useCL}
-                  onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, useCL: !!checked}))}
-                  disabled={leaveBalance.cl <= 0}
-                />
-                <label htmlFor="useCL" className="text-sm">
-                  Use Casual Leave (CL) - {leaveBalance.cl} days remaining
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="useRH"
-                  checked={selectedLeaveTypes.useRH}
-                  onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, useRH: !!checked}))}
-                  disabled={leaveBalance.rh <= 0 || selectedRH.length === 0}
-                />
-                <label htmlFor="useRH" className="text-sm">
-                  Use Restricted Holiday (RH) - {leaveBalance.rh} selections remaining
-                </label>
-              </div>
-            </div>
-            
-            {/* Leave Priority Selection - only show when both PL and CL are selected */}
-            {selectedLeaveTypes.usePL && selectedLeaveTypes.useCL && (
-              <div className="mt-4 space-y-2">
-                <label className="text-sm font-medium block">Leave Priority:</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="cl-first"
-                      name="leavePriority"
-                      checked={leavePriority === "cl-first"}
-                      onChange={() => setLeavePriority("cl-first")}
-                      className="rounded-full"
-                    />
-                    <label htmlFor="cl-first" className="text-sm">Use CL first, then PL</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="pl-first"
-                      name="leavePriority"
-                      checked={leavePriority === "pl-first"}
-                      onChange={() => setLeavePriority("pl-first")}
-                      className="rounded-full"
-                    />
-                    <label htmlFor="pl-first" className="text-sm">Use PL first, then CL</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="balanced"
-                      name="leavePriority"
-                      checked={leavePriority === "balanced"}
-                      onChange={() => setLeavePriority("balanced")}
-                      className="rounded-full"
-                    />
-                    <label htmlFor="balanced" className="text-sm">Balance between both</label>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "PPP") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(date) => {
+                          setStartDate(date)
+                          setStartDateOpen(false)
+                        }}
+                        disabled={(date) => isUsedDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">End Date</label>
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "PPP") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={(date) => {
+                          setEndDate(date)
+                          setEndDateOpen(false)
+                        }}
+                        disabled={(date) => isUsedDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={generateSuggestions}>Generate Leave Plans</Button>
-        </CardFooter>
-      </Card>
-
-      {suggestions.length > 0 && (
-        <div className="space-y-4 mt-6">
-          <h3 className="text-xl font-bold">Suggested Plans</h3>
-          <p className="text-muted-foreground">
-            Current leave balance: 
-            <Badge variant="outline" className="ml-1">PL: {leaveBalance.pl}</Badge> 
-            <Badge variant="outline" className="ml-1">CL: {leaveBalance.cl}</Badge>
-            <Badge variant="outline" className="ml-1">RH: {leaveBalance.rh}</Badge>
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suggestions.map((suggestion, index) => {
-              // Determine badge color based on included leave types
-              const badgeColor = suggestion.leaveTypes.usePL && suggestion.leaveTypes.useCL 
-                ? "border-purple-500" 
-                : suggestion.leaveTypes.usePL 
-                  ? "border-blue-500" 
-                  : suggestion.leaveTypes.useCL 
-                    ? "border-green-500" 
-                    : "border-amber-500";
               
-              return (
-                <Card key={index} className={badgeColor}>
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle>{suggestion.title}</CardTitle>
-                      <div className="flex space-x-1">
-                        {suggestion.leaveTypes.usePL && <Badge className="bg-blue-500">PL</Badge>}
-                        {suggestion.leaveTypes.useCL && <Badge className="bg-green-500">CL</Badge>}
-                        {suggestion.leaveTypes.useRH && <Badge className="bg-amber-500">RH</Badge>}
+              {/* Leave Type Selection */}
+              <div className="space-y-3 p-3 bg-gray-50 rounded-md">
+                <label className="text-sm font-medium block mb-2">
+                  Leave Types to Include
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="usePL"
+                      checked={selectedLeaveTypes.usePL}
+                      onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, usePL: !!checked}))}
+                      disabled={leaveBalance.pl <= 0}
+                    />
+                    <label htmlFor="usePL" className="text-sm">
+                      Use Paid Leave (PL) - {leaveBalance.pl} days remaining
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="useCL"
+                      checked={selectedLeaveTypes.useCL}
+                      onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, useCL: !!checked}))}
+                      disabled={leaveBalance.cl <= 0}
+                    />
+                    <label htmlFor="useCL" className="text-sm">
+                      Use Casual Leave (CL) - {leaveBalance.cl} days remaining
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="useRH"
+                      checked={selectedLeaveTypes.useRH}
+                      onCheckedChange={(checked) => setSelectedLeaveTypes(prev => ({...prev, useRH: !!checked}))}
+                      disabled={leaveBalance.rh <= 0 || selectedRH.length === 0}
+                    />
+                    <label htmlFor="useRH" className="text-sm">
+                      Use Restricted Holiday (RH) - {leaveBalance.rh} selections remaining
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Leave Priority Selection - only show when both PL and CL are selected */}
+                {selectedLeaveTypes.usePL && selectedLeaveTypes.useCL && (
+                  <div className="mt-4 space-y-2">
+                    <label className="text-sm font-medium block">Leave Priority:</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="cl-first"
+                          name="leavePriority"
+                          checked={leavePriority === "cl-first"}
+                          onChange={() => setLeavePriority("cl-first")}
+                          className="rounded-full"
+                        />
+                        <label htmlFor="cl-first" className="text-sm">Use CL first, then PL</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="pl-first"
+                          name="leavePriority"
+                          checked={leavePriority === "pl-first"}
+                          onChange={() => setLeavePriority("pl-first")}
+                          className="rounded-full"
+                        />
+                        <label htmlFor="pl-first" className="text-sm">Use PL first, then CL</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="balanced"
+                          name="leavePriority"
+                          checked={leavePriority === "balanced"}
+                          onChange={() => setLeavePriority("balanced")}
+                          className="rounded-full"
+                        />
+                        <label htmlFor="balanced" className="text-sm">Balance between both</label>
                       </div>
                     </div>
-                    <CardDescription>{suggestion.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <p><span className="font-medium">Total days:</span> {suggestion.days}</p>
-                      <p><span className="font-medium">Leaves required:</span> {suggestion.leavesRequired}</p>
-                      
-                      {/* Day breakdown */}
-                      <div>
-                        <p className="font-medium mb-2">Day breakdown:</p>
-                        <div className="border rounded-md overflow-hidden">
-                          <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-3 py-2 text-left font-medium text-gray-500">Date</th>
-                                <th className="px-3 py-2 text-left font-medium text-gray-500">Day</th>
-                                <th className="px-3 py-2 text-left font-medium text-gray-500">Type</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {suggestion.dayDetails.map((day, i) => (
-                                <tr key={i} className={`${day.isWeekend ? 'bg-gray-50' : ''} ${day.isHoliday ? 'bg-blue-50' : ''} ${day.isRH ? 'bg-amber-50' : ''} ${day.isUsed ? 'text-gray-400' : ''}`}>
-                                  <td className="px-3 py-2">{format(parseISO(day.date), "dd MMM")}</td>
-                                  <td className="px-3 py-2">{day.dayName}</td>
-                                  <td className="px-3 py-2">
-                                    {day.isWeekend 
-                                      ? <Badge variant="outline" className="bg-gray-100">Weekend</Badge> 
-                                      : day.isHoliday 
-                                        ? <Badge variant="outline" className="bg-blue-100">Holiday</Badge> 
-                                        : day.isRH 
-                                          ? <Badge variant="outline" className="bg-amber-100">RH</Badge> 
-                                          : day.isUsed 
-                                            ? <Badge variant="outline" className="bg-red-100">Used</Badge>
-                                            : <Badge variant="outline" className="bg-green-100">Leave</Badge>}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                      
-                      {/* Leave dates */}
-                      <div>
-                        <p className="font-medium mb-1">Leave dates:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {suggestion.dates.map((date, i) => {
-                            const dayInfo = suggestion.dayDetails.find(d => d.date === date);
-                            return (
-                              <Badge 
-                                key={i} 
-                                variant="outline"
-                                className={dayInfo?.isRH ? "border-amber-400 bg-amber-50" : ""}
-                              >
-                                {format(parseISO(date), "dd MMM")}
-                                {dayInfo?.isRH && " (RH)"}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      
-                      {/* Warnings */}
-                      {suggestion.warnings.length > 0 && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
-                          <div className="flex items-start">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <div>
-                              <p className="font-medium">Suggestions & Warnings</p>
-                              <ul className="mt-1 list-disc list-inside pl-1 space-y-1">
-                                {suggestion.warnings.map((warning, i) => (
-                                  <li key={i}>{warning}</li>
-                                ))}
-                              </ul>
-                            </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={generateSuggestions}>Generate Leave Plans</Button>
+            </CardFooter>
+          </Card>
+
+          {suggestions.length > 0 && (
+            <div className="space-y-4 mt-6">
+              <h3 className="text-xl font-bold">Suggested Plans</h3>
+              <p className="text-muted-foreground">
+                Current leave balance: 
+                <Badge variant="outline" className="ml-1">PL: {leaveBalance.pl}</Badge> 
+                <Badge variant="outline" className="ml-1">CL: {leaveBalance.cl}</Badge>
+                <Badge variant="outline" className="ml-1">RH: {leaveBalance.rh}</Badge>
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {suggestions.map((suggestion, index) => {
+                  // Determine badge color based on included leave types
+                  const badgeColor = suggestion.leaveTypes.usePL && suggestion.leaveTypes.useCL 
+                    ? "border-purple-500" 
+                    : suggestion.leaveTypes.usePL 
+                      ? "border-blue-500" 
+                      : suggestion.leaveTypes.useCL 
+                        ? "border-green-500" 
+                        : "border-amber-500";
+                  
+                  return (
+                    <Card key={index} className={badgeColor}>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <CardTitle>{suggestion.title}</CardTitle>
+                          <div className="flex space-x-1">
+                            {suggestion.leaveTypes.usePL && <Badge className="bg-blue-500">PL</Badge>}
+                            {suggestion.leaveTypes.useCL && <Badge className="bg-green-500">CL</Badge>}
+                            {suggestion.leaveTypes.useRH && <Badge className="bg-amber-500">RH</Badge>}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => handleUsePlan(suggestion)}
-                    >
-                      Use This Plan
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                        <CardDescription>{suggestion.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p><span className="font-medium">Total days:</span> {suggestion.days}</p>
+                          <p><span className="font-medium">Leaves required:</span> {suggestion.leavesRequired}</p>
+                          
+                          {/* Day breakdown */}
+                          <div>
+                            <p className="font-medium mb-2">Day breakdown:</p>
+                            <div className="border rounded-md overflow-hidden">
+                              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-500">Date</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-500">Day</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-500">Type</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {suggestion.dayDetails.map((day, i) => (
+                                    <tr key={i} className={`${day.isWeekend ? 'bg-gray-50' : ''} ${day.isHoliday ? 'bg-blue-50' : ''} ${day.isRH ? 'bg-amber-50' : ''} ${day.isUsed ? 'text-gray-400' : ''}`}>
+                                      <td className="px-3 py-2">{format(parseISO(day.date), "dd MMM")}</td>
+                                      <td className="px-3 py-2">{day.dayName}</td>
+                                      <td className="px-3 py-2">
+                                        {day.isWeekend 
+                                          ? <Badge variant="outline" className="bg-gray-100">Weekend</Badge> 
+                                          : day.isHoliday 
+                                            ? <Badge variant="outline" className="bg-blue-100">Holiday</Badge> 
+                                            : day.isRH 
+                                              ? <Badge variant="outline" className="bg-amber-100">RH</Badge> 
+                                              : day.isUsed 
+                                                ? <Badge variant="outline" className="bg-red-100">Used</Badge>
+                                                : <Badge variant="outline" className="bg-green-100">Leave</Badge>}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          
+                          {/* Leave dates */}
+                          <div>
+                            <p className="font-medium mb-1">Leave dates:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {suggestion.dates.map((date, i) => {
+                                const dayInfo = suggestion.dayDetails.find(d => d.date === date);
+                                return (
+                                  <Badge 
+                                    key={i} 
+                                    variant="outline"
+                                    className={dayInfo?.isRH ? "border-amber-400 bg-amber-50" : ""}
+                                  >
+                                    {format(parseISO(date), "dd MMM")}
+                                    {dayInfo?.isRH && " (RH)"}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          
+                          {/* Warnings */}
+                          {suggestion.warnings.length > 0 && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                              <div className="flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <div>
+                                  <p className="font-medium">Suggestions & Warnings</p>
+                                  <ul className="mt-1 list-disc list-inside pl-1 space-y-1">
+                                    {suggestion.warnings.map((warning, i) => (
+                                      <li key={i}>{warning}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => handleUsePlan(suggestion)}
+                        >
+                          Use This Plan
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="days-count" className="mt-6">
+          <NumberOfDaysOptimizer />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 } 
